@@ -17,11 +17,11 @@
    // Build Target Configuration
    //
    var(my_design, tt_um_example)   /// The name of your top-level TT module, to match your info.yml.
-   var(target, FPGA)  /// FPGA or ASIC
+   var(target, ASIC)   /// Note, the FPGA CI flow will set this to FPGA.
    //-------------------------------------------------------
    
    var(in_fpga, 1)   /// 1 to include the demo board. (Note: Logic will be under /fpga_pins/fpga.)
-   var(debounce_inputs, 0)
+   var(debounce_inputs, 1)
                      /// Legal values:
                      ///   1: Provide synchronization and debouncing on all input signals.
                      ///   0: Don't provide synchronization and debouncing.
@@ -46,30 +46,85 @@
    
    |calc
       @0
-         $reset = *reset;
+         $val2[7:0] = {4'b0, *ui_in[0:3]};
+         $op[1:0] = *ui_in[5:4];
+         
+         $equals_in = *ui_in[7];
+         
+         $valid =  
+            $equals_in && ! >>1$equals_in;
+               
+         
+     
+         
+         
+            
+            
       @1
-         $val1[7:0] =
-            >>1$out;
-         $val2[7:0] = {5'b0, $rand2[2:0]};
+         $reset = *reset;
+         $val1[7:0] = >>1$out;
+         //$val2[7:0] = {3'b0, $rand2[3:0]};
+         $val2[7:0] = 1;
+         $sum[7:0] = $val1[7:0] + $val2[7:0];
+         $diff[7:0] = $val1[7:0] - $val2[7:0];
+         $prod[7:0] = $val1[7:0] * $val2[7:0];
+         $quot[7:0] = $val1[7:0] / $val2[7:0];
 
-         $sum[7:0] = $val1 + $val2;
-         $diff[7:0] = $val1 - $val2;
-         $prod[7:0] = $val1 * $val2;
-         $quot[7:0] = $val1 / $val2;
-
+         
+         
          $out[7:0] =
-            $reset
-               ? 8'd0 :
+            $reset == 1'b1
+               ? 8'b0:
+            ! $valid
+               ? >>1$out: 
             $op[1:0] == 2'd0
-               ? $sum :
+               ? $sum[7:0]:
             $op[1:0] == 2'd1
-               ? $diff :
+               ? $diff[7:0]:
             $op[1:0] == 2'd2
-               ? $prod :
+               ? $prod[7:0]:
+            //default   
+               $quot[7:0];
+               
+         $digit[3:0] = $out[3:0];
+         $op[1:0] = 0;
+         *uo_out[7:0] = 
+            $reset == 1'b1
+               ? 8'b0:
+            $digit[3:0] == 1'd0
+               ? 8'b00111111:
+            $digit[3:0] == 4'b0001
+               ? 8'b00000110:
+            $digit[3:0] == 4'b0010
+               ? 8'b01011011: 
+            $digit[3:0] == 4'b0011
+               ? 8'b01001111:
+            $digit[3:0] == 4'b0100
+               ? 8'b01100110:
+            $digit[3:0] == 4'b0101
+               ? 8'b01101101:
+            $digit[3:0] == 4'b0110
+               ? 8'b01111101:
+            $digit[3:0] == 4'b0111
+               ? 8'b00000111:
+            $digit[3:0] == 4'b1000
+               ? 8'b01111111:
+            $digit[3:0] == 4'b1001
+               ? 8'b01100111:
+            $digit[3:0] == 4'b1010
+               ? 8'b01110111:
+            $digit[3:0] == 4'b1011
+               ? 8'b01111100:
+            $digit[3:0] == 4'b1100
+               ? 8'b00111001:
+            $digit[3:0] == 4'b1101
+               ? 8'b01011110:
+            $digit[3:0] == 4'b1110
+               ? 8'b01111001:
             //default
-                $quot;
-         m5+sseg_decoder($segments, $out[3:0])
-      *uo_out = {1'b0, ~$segments};
+               8'b01110001;
+ 
+   
    // Note that pipesignals assigned here can be found under /fpga_pins/fpga.
    
    
@@ -77,7 +132,7 @@
    m5+cal_viz(@1, m5_if(m5_in_fpga, /fpga, /top))
    
    // Connect Tiny Tapeout outputs. Note that uio_ outputs are not available in the Tiny-Tapeout-3-based FPGA boards.
-   *uo_out = 8'b0;
+   //*uo_out = 8'b0;
    m5_if_neq(m5_target, FPGA, ['*uio_out = 8'b0;'])
    m5_if_neq(m5_target, FPGA, ['*uio_oe = 8'b0;'])
 
